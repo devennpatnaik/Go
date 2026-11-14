@@ -1,11 +1,14 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { fromGtp, toGtp, type GtpIntent } from "./gtp";
+import { pushReview, reviewCommands, reviewStart } from "./review";
 import type { Color } from "./rules";
 
 export const GNU_GO_NAME = "GNU Go";
 export const GNU_GO_LEVEL = 10;
 
-const columns = "ABCDEFGHJKLMNOPQRST";
+export type EngineIntent = GtpIntent;
+export { fromGtp, toGtp, winnerFromScore } from "./gtp";
 
 export type EngineMove = {
   color: Color;
@@ -14,37 +17,9 @@ export type EngineMove = {
   y: number | null;
 };
 
-export type EngineIntent =
-  | { kind: "play"; x: number; y: number }
-  | { kind: "pass" }
-  | { kind: "resign" };
-
 export function gnugoPath(): string {
   if (existsSync("/usr/games/gnugo")) return "/usr/games/gnugo";
   return "gnugo";
-}
-
-export function toGtp(x: number, y: number, size: number): string {
-  return `${columns[x]}${size - y}`;
-}
-
-export function fromGtp(token: string, size: number): EngineIntent | null {
-  const word = token.trim().toUpperCase();
-  if (word === "PASS") return { kind: "pass" };
-  if (word === "RESIGN") return { kind: "resign" };
-  const match = /^([A-HJ-T])(\d{1,2})$/.exec(word);
-  if (!match) return null;
-  const x = columns.indexOf(match[1]);
-  const row = Number(match[2]);
-  if (x < 0 || row < 1 || row > size) return null;
-  return { kind: "play", x, y: size - row };
-}
-
-export function winnerFromScore(text: string | null): "black" | "white" | null {
-  if (!text) return null;
-  const match = /([BW])\+/.exec(text);
-  if (!match) return null;
-  return match[1] === "B" ? "black" : "white";
 }
 
 function setup(size: number, moves: EngineMove[]): string[] {
@@ -121,6 +96,32 @@ export async function gnugoMove(input: {
   return intent;
 }
 
+export async function gnugoReview(input: {
+  size: number;
+  moves: EngineMove[];
+  finalColor: Color;
+  signal?: AbortSignal;
+  onPoint?: (index: number, best: GtpIntent) => void;
+}): Promise<{ score: string; suggestion: GtpIntent }> {
+  let cursor = reviewStart();
+  let score = "";
+  let suggestion: GtpIntent | null = null;
+  await runReview(
+    reviewCommands(input.size, input.moves, input.finalColor),
+    (reply) => {
+      if (cursor.phase === "end") return;
+      const step = pushReview(cursor, reply, input.moves, input.size);
+      cursor = step.cursor;
+      if (step.best && step.index != null) input.onPoint?.(step.index, step.best);
+      if (step.score) score = step.score;
+      if (step.suggestion) suggestion = step.suggestion;
+    },
+    input.signal,
+  );
+  if (cursor.phase !== "end" || !score || !suggestion) throw new Error("gnugo");
+  return { score, suggestion };
+}
+
 function run(commands: string[], level: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(gnugoPath(), ["--mode", "gtp", "--level", String(level), "--quiet"], {
@@ -143,6 +144,71 @@ function run(commands: string[], level: number): Promise<string> {
       clearTimeout(timer);
       resolve(stdout);
     });
+    child.stdin.write(commands.join("\n") + "\n");
+    child.stdin.end();
+  });
+}
+
+function runReview(commands: string[], onReply: (reply: string) => void, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("gnugo"));
+      return;
+    }
+    const child = spawn(gnugoPath(), ["--mode", "gtp", "--level", String(GNU_GO_LEVEL), "--quiet"], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let settled = false;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    const total = setTimeout(() => fail(new Error("gnugo")), 20 * 60 * 1000);
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (idle) clearTimeout(idle);
+      clearTimeout(total);
+      signal?.removeEventListener("abort", onAbort);
+      if (error) {
+        child.kill("SIGKILL");
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+    function fail(error: Error) {
+      finish(error);
+    }
+    function bump() {
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(() => fail(new Error("gnugo")), 90_000);
+    }
+    function onAbort() {
+      fail(new Error("gnugo"));
+    }
+    bump();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (settled) return;
+      bump();
+      stdout += chunk.replaceAll("\r\n", "\n");
+      try {
+        while (true) {
+          const split = stdout.indexOf("\n\n");
+          if (split < 0) break;
+          const part = stdout.slice(0, split).trim();
+          stdout = stdout.slice(split + 2);
+          if (!part) continue;
+          if (!part.startsWith("=")) throw new Error("gnugo");
+          onReply(part.slice(1).trim());
+        }
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error("gnugo"));
+      }
+    });
+    child.on("error", (error) => fail(error));
+    child.on("close", () => finish());
+    child.stdin.on("error", () => undefined);
     child.stdin.write(commands.join("\n") + "\n");
     child.stdin.end();
   });

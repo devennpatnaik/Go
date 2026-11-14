@@ -41,13 +41,15 @@ export default function Board({
   interactive,
   onPlay,
   label,
-  hint = null,
+  mark = null,
+  coords = false,
 }: {
   state: GameState;
   interactive: boolean;
   onPlay?: (x: number, y: number) => void;
   label: string;
-  hint?: Point | null;
+  mark?: Point | null;
+  coords?: boolean;
 }) {
   const size = state.size;
   const pad = (1.5 / (size + 2)) * 100;
@@ -107,14 +109,14 @@ export default function Board({
           <circle key={`${star.x},${star.y}`} className="hoshi" cx={at(star.x)} cy={at(star.y)} r={0.55} />
         ))}
       </svg>
-      {interactive
+      {interactive || coords
         ? cols.map((letter, x) => (
             <span key={`c${letter}`} className="coord x" style={{ left: `${at(x)}%` }}>
               {letter}
             </span>
           ))
         : null}
-      {interactive
+      {interactive || coords
         ? Array.from({ length: size }, (_, y) => (
             <span key={`r${y}`} className="coord y" style={{ top: `${at(y)}%` }}>
               {size - y}
@@ -125,6 +127,7 @@ export default function Board({
         Array.from({ length: size }, (_, x) => {
           const stone = state.board[y][x];
           const last = state.lastMove?.x === x && state.lastMove?.y === y;
+          const best = mark?.x === x && mark?.y === y;
           const ghost = interactive && !stone && hover?.x === x && hover?.y === y;
           return (
             <button
@@ -135,8 +138,9 @@ export default function Board({
               data-point={`${x},${y}`}
               data-stone={stone ?? ""}
               data-last={last ? "true" : "false"}
+              data-best={best ? "true" : "false"}
               disabled={!interactive}
-              aria-label={`${cols[x]}${size - y}${stone ? ` ${stone}` : ""}`}
+              aria-label={`${cols[x]}${size - y}${stone ? ` ${stone}` : ""}${best ? " best" : ""}`}
               onMouseEnter={() => interactive && setHover({ x, y })}
               onMouseLeave={() => setHover(null)}
               onFocus={() => setCursor({ x, y })}
@@ -144,12 +148,21 @@ export default function Board({
             >
               {stone ? <Stone color={stone} mark={last} /> : null}
               {ghost ? <span className={`ghost ${state.toPlay}`} /> : null}
-              {hint?.x === x && hint?.y === y ? <span className="hint" /> : null}
+              {best ? <BestMark /> : null}
             </button>
           );
         }),
       )}
     </div>
+  );
+}
+
+function BestMark() {
+  return (
+    <svg className="best" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="3" />
+      <path d="M12 5.2 18.2 17.4H5.8Z" fill="currentColor" />
+    </svg>
   );
 }
 
