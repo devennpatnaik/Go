@@ -23,10 +23,10 @@ export default async function StatsPage() {
       <ol className="history">
         {rows.map((row) => (
           <li key={row.game_id}>
-            <span>{row.result}</span>
-            <span>{Math.round(row.rating_after)}</span>
-            <span>{row.score_estimate ?? ""}</span>
-            <span>{row.suggestion ?? ""}</span>
+            <span className="history-result">{row.result}</span>
+            <span className="history-rating">{Math.round(row.rating_after)}</span>
+            <span className="history-score">{row.score_estimate ?? ""}</span>
+            <span className="history-move">{row.suggestion ?? ""}</span>
           </li>
         ))}
       </ol>
@@ -41,10 +41,11 @@ function Spark({ values }: { values: number[] }) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
+  const radius = values.length === 1 ? 22 : 7;
   const points = values
     .map((value, index) => {
       const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / span) * (height - 16) - 8;
+      const y = height - ((value - min) / span) * (height - 48) - 24;
       return `${x},${y}`;
     })
     .join(" ");
@@ -53,8 +54,8 @@ function Spark({ values }: { values: number[] }) {
       <polyline points={points} />
       {values.map((value, index) => {
         const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-        const y = height - ((value - min) / span) * (height - 16) - 8;
-        return <circle key={index} cx={x} cy={y} r={4} />;
+        const y = height - ((value - min) / span) * (height - 48) - 24;
+        return <circle key={index} cx={x} cy={y} r={radius} />;
       })}
     </svg>
   );

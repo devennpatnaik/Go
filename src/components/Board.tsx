@@ -131,7 +131,7 @@ export default function Board({
               key={`${x},${y}`}
               type="button"
               className="point"
-              style={{ left: `${at(x)}%`, top: `${at(y)}%`, width: `${step * 0.92}%`, height: `${step * 0.92}%` }}
+              style={{ left: `${at(x)}%`, top: `${at(y)}%`, width: `${step}%`, height: `${step}%` }}
               data-point={`${x},${y}`}
               data-stone={stone ?? ""}
               data-last={last ? "true" : "false"}
