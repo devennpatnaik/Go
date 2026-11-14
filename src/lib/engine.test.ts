@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fromGtp, gnugoFinalScore, gnugoMove, gnugoReport, toGtp, winnerFromScore } from "./engine";
+import { fromGtp, gnugoFinalScore, gnugoMove, gnugoReport, gnugoReview, toGtp, winnerFromScore } from "./engine";
 import { place, createGame } from "./rules";
 
 describe("gtp coordinates", () => {
@@ -50,6 +50,26 @@ describe("GNU Go", () => {
       color: "black",
       moves: [{ color: "black", kind: "play", x: 2, y: 2 }],
     });
+    expect(report.score.length).toBeGreaterThan(0);
+    expect(["play", "pass", "resign"]).toContain(report.suggestion.kind);
+  });
+
+  it("names a best move before each played move, including a resignation", async () => {
+    const seen: number[] = [];
+    const report = await gnugoReview({
+      size: 9,
+      finalColor: "white",
+      moves: [
+        { color: "black", kind: "play", x: 0, y: 8 },
+        { color: "white", kind: "pass", x: null, y: null },
+        { color: "black", kind: "resign", x: null, y: null },
+      ],
+      onPoint: (index, best) => {
+        seen.push(index);
+        expect(["play", "pass", "resign"]).toContain(best.kind);
+      },
+    });
+    expect(seen).toEqual([0, 1, 2]);
     expect(report.score.length).toBeGreaterThan(0);
     expect(["play", "pass", "resign"]).toContain(report.suggestion.kind);
   });
