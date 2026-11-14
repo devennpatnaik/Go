@@ -153,32 +153,38 @@ export default function Room({ id }: { id: string }) {
         <Board state={state} interactive={yours} label={title.heading} hint={hint} onPlay={(x, y) => void send({ kind: "play", x, y })} />
       </div>
       <aside className="panel">
-        <p className="status">
-          <span className="status-title">{title.heading}</span>
-          <span className="status-kicker">{title.kicker}</span>
-        </p>
-        {game.engine ? <p className="engine-name">{game.engine}</p> : null}
-        {finished && rating ? <p className="rating">{rating}</p> : null}
-        <p className="move-no">{clocks}</p>
-        <p className="move-no">Move {String(state.plies).padStart(2, "0")}</p>
-        {analysis ? <p className="score-line">{analysis.score}</p> : null}
-        {analysis ? <p className="note">{analysis.suggestion.label}</p> : null}
-        {reading ? (
-          <p className="note" aria-busy="true">
-            …
-          </p>
-        ) : null}
-        <p className="note">{note}</p>
-        <div className="prisoners">
-          <span>Prisoners</span>
-          <span className="count">
-            <i className="pip black" />
-            {String(state.prisoners.black).padStart(2, "0")}
-          </span>
-          <span className="count">
-            <i className="pip white" />
-            {String(state.prisoners.white).padStart(2, "0")}
-          </span>
+        <div className="panel-main">
+          <div className="panel-lead">
+            <p className="status">
+              <span className="status-title">{title.heading}</span>
+              <span className="status-kicker">{title.kicker}</span>
+            </p>
+            {game.engine && game.engine !== title.heading ? <p className="engine-name">{game.engine}</p> : null}
+            {finished && rating ? <p className="rating">{rating}</p> : null}
+          </div>
+          <div className="panel-facts">
+            <p className="move-no">{clocks}</p>
+            <p className="move-no">Move {String(state.plies).padStart(2, "0")}</p>
+            <div className="prisoners">
+              <span className="prisoners-label">Prisoners</span>
+              <span className="count">
+                <i className="pip black" />
+                {String(state.prisoners.black).padStart(2, "0")}
+              </span>
+              <span className="count">
+                <i className="pip white" />
+                {String(state.prisoners.white).padStart(2, "0")}
+              </span>
+            </div>
+          </div>
+          {analysis ? <p className="score-line">{analysis.score}</p> : null}
+          {analysis ? <p className="note">{analysis.suggestion.label}</p> : null}
+          {reading ? (
+            <p className="note" aria-busy="true">
+              Reading
+            </p>
+          ) : null}
+          {note ? <p className="note">{note}</p> : null}
         </div>
         {finished ? (
           <div className="result-bar">
@@ -207,7 +213,6 @@ export default function Room({ id }: { id: string }) {
             </button>
           </div>
         )}
-        <p className="link">{`/g/${game.id}`}</p>
       </aside>
     </main>
   );

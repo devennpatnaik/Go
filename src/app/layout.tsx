@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { getIdentity } from "../../cursor/identity.js";
 import AdSlot from "@/components/AdSlot";
@@ -13,6 +13,13 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Go",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#101210",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
